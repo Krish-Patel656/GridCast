@@ -1,4 +1,4 @@
-# F1 Analytics Hub
+# GridCast
 
 A FastAPI site for Formula 1 race data with a model that ranks the field before
 a Grand Prix starts. Results, championship tables, session calendars and lap
