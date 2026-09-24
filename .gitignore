@@ -1,0 +1,14 @@
+venv/
+__pycache__/
+*.pyc
+.cache/
+cache/
+.DS_Store
+
+# ML artifacts (regenerate locally)
+data/processed/*.csv
+data/processed/*.json
+data/processed/*.joblib
+models/*.pt
+models/metadata.json
+node_modules
