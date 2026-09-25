@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}F1 Analytics Hub — race results, standings and predictions{% endblock %}
+{% block nav_results %}active{% endblock %}
+
+{% block content %}
+<section class="hero">
+    {% include "_hero_track.html" %}
+
+    <div class="hero__content">
+        <span class="eyebrow">Formula 1 · {{ years[0] }}–{{ years[-1] }}</span>
+        <h1>Every lap,<br><em>every number</em></h1>
+        <p class="hero__lead">
+            Official classifications, championship tables, lap telemetry, and a model that
+            ranks the field before the cars leave the garage.
+        </p>
+        <div class="hero__actions">
+            <a href="#finder" class="btn btn--primary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+                </svg>
+                Find a race
+            </a>
+            <a href="/predictions" class="btn btn--ghost">Predict the next Grand Prix</a>
+        </div>
+
+        {% if next_race %}
+        <div class="countdown" data-countdown="{{ next_race.starts_at }}">
+            <div class="countdown__meta">
+                <span class="countdown__label">Lights out in</span>
+                <span class="countdown__race">{{ next_race.event_name }}</span>
+                <span class="countdown__label">{{ next_race.location }}{% if next_race.date %} · {{ next_race.date }}{% endif %}</span>
+            </div>
+            <div class="countdown__unit"><span class="countdown__value" data-unit="days">--</span><span class="countdown__name">days</span></div>
+            <div class="countdown__unit"><span class="countdown__value" data-unit="hours">--</span><span class="countdown__name">hrs</span></div>
+            <div class="countdown__unit"><span class="countdown__value" data-unit="minutes">--</span><span class="countdown__name">min</span></div>
+            <div class="countdown__unit"><span class="countdown__value" data-unit="seconds">--</span><span class="countdown__name">sec</span></div>
+        </div>
+        {% endif %}
+    </div>
+</section>
+
+<section class="section" id="finder">
+    <div class="card" data-reveal>
+        <div class="card__header">
+            <h2>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 3v18h18"/><path d="M18 9l-5-6-4 8-3-3"/>
+                </svg>
+                Race result finder
+            </h2>
+            <span class="card__count">{{ races|length }} rounds</span>
+        </div>
+        <div class="card__body">
+            <form action="/results" method="get" class="form-row" data-page="races" data-pending="Loading session…">
+                {% include "_year_select.html" %}
+                {% include "_round_select.html" %}
+                <button type="submit" class="btn btn--primary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+                    </svg>
+                    Get results
+                </button>
+            </form>
+        </div>
+    </div>
+</section>
+
+<section class="section">
+    <div class="grid grid--3">
+        <article class="card card--hover feature" data-reveal>
+            <div class="feature__icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 20V10M18 20V4M6 20v-4"/>
+                </svg>
+            </div>
+            <h3>Official results</h3>
+            <p>Full classifications from {{ years[0] }} to {{ years[-1] }}, with grid slots, points and status for every entry.</p>
+        </article>
+
+        <article class="card card--hover feature" data-reveal>
+            <div class="feature__icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/>
+                </svg>
+            </div>
+            <h3>Lap telemetry</h3>
+            <p>Fastest lap and sector splits, the shape of every lap run, and how each tyre stint went.</p>
+        </article>
+
+        <article class="card card--hover feature" data-reveal>
+            <div class="feature__icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
+                </svg>
+            </div>
+            <h3>Race predictions</h3>
+            <p>A ranking model orders the field using only what is known before the start — never the result itself.</p>
+        </article>
+    </div>
+</section>
+{% endblock %}

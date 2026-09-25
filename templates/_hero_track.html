@@ -1,0 +1,25 @@
+{# Three depths of the same circuit outline; the parallax handler moves each
+   layer at a different rate, and the front one carries a glowing hot lap. #}
+<div class="hero__layer hero__layer--back" aria-hidden="true">
+    <svg class="hero__track" viewBox="0 0 400 260" fill="none">
+        <path class="track-line" d="M64 198c-38-10-34-70 8-80 48-12 68 30 118 20 40-8 36-70 86-80 46-8 84 22 74 62-8 32-50 30-70 50-22 22 20 46-20 58-50 16-118-14-196-30Z"
+              transform="translate(-26 18) scale(1.16)" transform-origin="200 130"/>
+    </svg>
+</div>
+<div class="hero__layer hero__layer--mid" aria-hidden="true">
+    <svg class="hero__track" viewBox="0 0 400 260" fill="none">
+        <path class="track-line" d="M64 198c-38-10-34-70 8-80 48-12 68 30 118 20 40-8 36-70 86-80 46-8 84 22 74 62-8 32-50 30-70 50-22 22 20 46-20 58-50 16-118-14-196-30Z"
+              stroke-dasharray="2 12" transform="translate(-12 8) scale(1.07)" transform-origin="200 130"/>
+    </svg>
+</div>
+<div class="hero__layer hero__layer--front" aria-hidden="true">
+    <svg class="hero__track" viewBox="0 0 400 260" fill="none">
+        <path class="track-line" d="M64 198c-38-10-34-70 8-80 48-12 68 30 118 20 40-8 36-70 86-80 46-8 84 22 74 62-8 32-50 30-70 50-22 22 20 46-20 58-50 16-118-14-196-30Z"/>
+        <path class="track-glow" d="M64 198c-38-10-34-70 8-80 48-12 68 30 118 20 40-8 36-70 86-80 46-8 84 22 74 62-8 32-50 30-70 50-22 22 20 46-20 58-50 16-118-14-196-30Z"/>
+        <g class="track-markers">
+            <circle cx="64" cy="198" r="3"/>
+            <circle cx="190" cy="138" r="2.5"/>
+            <circle cx="296" cy="180" r="2.5"/>
+        </g>
+    </svg>
+</div>

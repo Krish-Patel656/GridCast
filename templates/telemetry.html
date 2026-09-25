@@ -1,0 +1,281 @@
+{% extends "base.html" %}
+
+{% block title %}Telemetry — F1 Analytics Hub{% endblock %}
+{% block nav_telemetry %}active{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <span class="eyebrow">Timing data</span>
+    <h1>Lap telemetry</h1>
+    <p>Pick a driver's race for their fastest lap and its sector splits, every lap they ran, and how each tyre stint went.</p>
+</div>
+
+<div class="card" data-reveal>
+    <div class="card__body">
+        {% set year = selected_year or years[-1] %}
+        <form action="/telemetry" method="get" class="form-row" data-page="telemetry" data-pending="Loading laps…">
+            {% include "_year_select.html" %}
+
+            <div class="field">
+                <label for="round">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+                    </svg>
+                    Grand Prix
+                </label>
+                <div class="select">
+                    <select id="round" name="round" required>
+                        <option value="">Select a season first…</option>
+                    </select>
+                    <span class="select__arrow">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                            <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                    </span>
+                </div>
+            </div>
+
+            <div class="field">
+                <label for="driver">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/>
+                    </svg>
+                    Driver
+                </label>
+                <div class="select">
+                    <select id="driver" name="driver" required>
+                        <option value="">Select a Grand Prix first…</option>
+                    </select>
+                    <span class="select__arrow">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                            <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                    </span>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn--primary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/>
+                </svg>
+                Load telemetry
+            </button>
+        </form>
+        <p style="margin: 16px 0 0; color: var(--text-faint); font-size: 13px">
+            The first load of a session downloads its timing data, which can take a little while.
+        </p>
+    </div>
+</div>
+
+{% if error_msg %}
+<div class="notice notice--error" data-reveal style="margin-top: 24px">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+    </svg>
+    <div>
+        <h3>Could not load telemetry</h3>
+        <p>{{ error_msg }}</p>
+    </div>
+</div>
+{% endif %}
+
+{% if preview %}
+<div class="card" data-reveal style="margin-top: 24px; --accent: {{ preview.team_color }}">
+    <div class="card__header">
+        <h2>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/>
+            </svg>
+            {{ preview.race.event_name }} — {{ preview.driver_name }}
+        </h2>
+        <span class="card__count">{{ preview.total_laps }} laps</span>
+    </div>
+    <div class="card__body">
+        <div class="stat-grid">
+            <div class="stat">
+                <span class="stat__label">Fastest lap</span>
+                <span class="stat__value" style="color: {{ preview.team_color }}">{{ preview.fastest_lap or '—' }}</span>
+            </div>
+            <div class="stat">
+                <span class="stat__label">Set on lap</span>
+                <span class="stat__value">{{ preview.lap_number or '—' }}{% if preview.compound %}<small> · {{ preview.compound }}</small>{% endif %}</span>
+            </div>
+            <div class="stat">
+                <span class="stat__label">Median lap</span>
+                <span class="stat__value">{{ preview.median_lap or '—' }}</span>
+            </div>
+            <div class="stat">
+                <span class="stat__label">Speed trap</span>
+                <span class="stat__value">{% if preview.speed_trap_kmh %}{{ preview.speed_trap_kmh | round | int }}<small> km/h</small>{% else %}—{% endif %}</span>
+            </div>
+            <div class="stat">
+                <span class="stat__label">{% if preview.avg_speed_kmh %}Average speed{% else %}Tyre age on that lap{% endif %}</span>
+                <span class="stat__value">
+                    {%- if preview.avg_speed_kmh -%}
+                        {{ preview.avg_speed_kmh | round | int }}<small> km/h</small>
+                    {%- elif preview.tyre_life is not none -%}
+                        {{ preview.tyre_life }}<small> laps</small>
+                    {%- else -%}—{%- endif -%}
+                </span>
+            </div>
+        </div>
+
+        {% if preview.sectors and preview.sectors[0] %}
+        <div class="sector-row">
+            {% for sector in preview.sectors %}
+            <div class="sector">
+                <span class="sector__label">Sector {{ loop.index }}</span>
+                <span class="sector__value">{{ sector or '—' }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if preview.lap_chart | length > 2 %}
+{% set seconds = preview.lap_chart | map(attribute='seconds') | list %}
+{% set best = seconds | min %}
+{% set ceiling = best * 1.12 %}
+<div class="card" data-reveal style="margin-top: 24px">
+    <div class="card__header">
+        <h2>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 17 9 11 13 15 21 7"/><polyline points="14 7 21 7 21 14"/>
+            </svg>
+            Lap by lap
+        </h2>
+        <span class="card__count">best {{ preview.fastest_lap }}</span>
+    </div>
+    <div class="card__body">
+        <div class="lap-chart">
+            <svg viewBox="0 0 1000 260" preserveAspectRatio="none" role="img"
+                 aria-label="Lap times across the race for {{ preview.driver_code }}">
+                <defs>
+                    <linearGradient id="lapFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="{{ preview.team_color }}" stop-opacity="0.35"/>
+                        <stop offset="100%" stop-color="{{ preview.team_color }}" stop-opacity="0"/>
+                    </linearGradient>
+                </defs>
+                {% for line in [0, 65, 130, 195, 260] %}
+                <line x1="0" y1="{{ line }}" x2="1000" y2="{{ line }}" stroke="rgba(255,255,255,0.06)" stroke-width="1"
+                      vector-effect="non-scaling-stroke"/>
+                {% endfor %}
+                {% set count = preview.lap_chart | length %}
+                {% set ns = namespace(points=[]) %}
+                {% for point in preview.lap_chart %}
+                    {% set x = (loop.index0 / (count - 1) * 1000) | round(1) %}
+                    {% set capped = [point.seconds, ceiling] | min %}
+                    {% set y = (240 - (ceiling - capped) / (ceiling - best) * 220) | round(1) %}
+                    {% set ns.points = ns.points + ["%s,%s" | format(x, y)] %}
+                {% endfor %}
+                <polygon points="0,260 {{ ns.points | join(' ') }} 1000,260" fill="url(#lapFill)"/>
+                <polyline points="{{ ns.points | join(' ') }}" fill="none" stroke="{{ preview.team_color }}"
+                          stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+            </svg>
+            <div class="lap-chart__axis">
+                <span>Lap 1</span>
+                <span>Quicker laps sit higher · pit and traffic laps are capped</span>
+                <span>Lap {{ preview.lap_chart[-1].lap }}</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if preview.speed_trace | length > 2 %}
+{% set speeds = preview.speed_trace | map(attribute='speed') | list %}
+{% set top = speeds | max %}
+{% set floor = speeds | min %}
+<div class="card" data-reveal style="margin-top: 24px">
+    <div class="card__header">
+        <h2>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 20a8 8 0 1 1 8-8"/><line x1="12" y1="12" x2="17" y2="8"/>
+            </svg>
+            Speed on the fastest lap
+        </h2>
+        <span class="card__count">{{ top | round | int }} km/h peak</span>
+    </div>
+    <div class="card__body">
+        <div class="lap-chart">
+            <svg viewBox="0 0 1000 260" preserveAspectRatio="none" role="img"
+                 aria-label="Speed against lap distance for {{ preview.driver_code }}">
+                <defs>
+                    <linearGradient id="speedFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="{{ preview.team_color }}" stop-opacity="0.35"/>
+                        <stop offset="100%" stop-color="{{ preview.team_color }}" stop-opacity="0"/>
+                    </linearGradient>
+                </defs>
+                {% for line in [0, 65, 130, 195, 260] %}
+                <line x1="0" y1="{{ line }}" x2="1000" y2="{{ line }}" stroke="rgba(255,255,255,0.06)" stroke-width="1"
+                      vector-effect="non-scaling-stroke"/>
+                {% endfor %}
+                {% set span = preview.speed_trace[-1].distance or 1 %}
+                {% set range = (top - floor) or 1 %}
+                {% set ns = namespace(points=[]) %}
+                {% for point in preview.speed_trace %}
+                    {% set x = (point.distance / span * 1000) | round(1) %}
+                    {% set y = (240 - (point.speed - floor) / range * 220) | round(1) %}
+                    {% set ns.points = ns.points + ["%s,%s" | format(x, y)] %}
+                {% endfor %}
+                <polygon points="0,260 {{ ns.points | join(' ') }} 1000,260" fill="url(#speedFill)"/>
+                <polyline points="{{ ns.points | join(' ') }}" fill="none" stroke="{{ preview.team_color }}"
+                          stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+            </svg>
+            <div class="lap-chart__axis">
+                <span>Start line</span>
+                <span>{{ floor | round | int }}–{{ top | round | int }} km/h over {{ (span / 1000) | round(2) }} km</span>
+                <span>Finish line</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if preview.stints %}
+<div class="card" data-reveal style="margin-top: 24px">
+    <div class="card__header">
+        <h2>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/>
+            </svg>
+            Stints
+        </h2>
+        <span class="card__count">{{ preview.stints | length }} stints</span>
+    </div>
+    <div class="table-scroll">
+        <table class="table">
+            <thead>
+                <tr><th>Stint</th><th>Compound</th><th class="num">Laps</th><th class="num">Best</th><th class="num">Average</th></tr>
+            </thead>
+            <tbody>
+                {% for stint in preview.stints %}
+                <tr>
+                    <td>{{ stint.stint }}</td>
+                    <td><span class="tyre tyre--{{ stint.compound | lower }}">{{ stint.compound }}</span></td>
+                    <td class="num">{{ stint.laps }}</td>
+                    <td class="num">{{ stint.best or '—' }}</td>
+                    <td class="num">{{ stint.average or '—' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% if not preview.speed_trace %}
+<p class="hint" data-reveal style="margin-top: 18px">
+    The full speed trace for this session was not archived, so the numbers above come from the lap timing table.
+</p>
+{% endif %}
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    window.__telemetryRound = {% if selected_round %}{{ selected_round }}{% else %}null{% endif %};
+    window.__telemetryDriver = {% if selected_driver %}"{{ selected_driver }}"{% else %}null{% endif %};
+</script>
+{% endblock %}

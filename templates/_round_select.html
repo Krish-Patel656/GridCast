@@ -1,0 +1,28 @@
+<div class="field">
+    <label for="round">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+            <circle cx="12" cy="10" r="3"/>
+        </svg>
+        Grand Prix
+    </label>
+    <div class="select">
+        <select id="round" name="round" required>
+            {% if races %}
+            <option value="" disabled {% if not selected_round %}selected{% endif %}>Select a Grand Prix…</option>
+            {% for r in races %}
+            <option value="{{ r.round }}" {% if selected_round and r.round == selected_round %}selected{% endif %}>
+                R{{ r.round }} · {{ r.event_name }}{% if r.country %} ({{ r.country }}){% endif %}
+            </option>
+            {% endfor %}
+            {% else %}
+            <option value="">No races for this season</option>
+            {% endif %}
+        </select>
+        <span class="select__arrow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                <polyline points="6 9 12 15 18 9"/>
+            </svg>
+        </span>
+    </div>
+</div>

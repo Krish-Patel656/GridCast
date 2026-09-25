@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+
+{% block title %}Race Predictions — F1 Analytics Hub{% endblock %}
+{% block nav_predictions %}active{% endblock %}
+
+{% block content %}
+{% set backtest = ml_meta.get('backtest') if ml_meta else None %}
+{% set pre = (backtest.get('pre_quali') if backtest else None) or (ml_meta.get('pre_quali') if ml_meta else None) or {} %}
+{% set post = (backtest.get('post_quali') if backtest else None) or (ml_meta.get('post_quali') if ml_meta else None) or {} %}
+{% set grid_base = (backtest.get('grid_baseline') if backtest else None) or (ml_meta.get('grid_baseline') if ml_meta else None) or {} %}
+{% set tested = backtest.get('races_evaluated') if backtest else (ml_meta.get('val_races') if ml_meta else None) %}
+
+<section class="hero">
+    {% include "_hero_track.html" %}
+
+    <div class="hero__content">
+        <span class="eyebrow">Machine learning</span>
+        <h1>Rank the field<br><em>before the start</em></h1>
+        <p class="hero__lead">
+            The model scores every entry from car strength, championship position, recent form,
+            circuit history, reliability, and the qualifying grid once it exists. It never sees
+            the race it is predicting.
+        </p>
+        {% if next_race %}
+        <div class="chip-row" style="margin-top: 26px; margin-bottom: 0">
+            <span class="chip chip--live">Next up: {{ next_race.event_name }}{% if next_race.date %} · {{ next_race.date }}{% endif %}</span>
+            <a class="chip" href="/predictions?year={{ next_race.year }}">Load {{ next_race.year }} season</a>
+        </div>
+        {% endif %}
+    </div>
+</section>
+
+{% if ml_ready and pre %}
+<section class="section">
+    <div class="grid grid--4">
+        <article class="card metric metric--accent" data-reveal>
+            <span class="metric__value" data-count-to="{{ (pre.get('order_accuracy', 0) * 100)|round(1) }}" data-count-decimals="1" data-count-suffix="%">0%</span>
+            <span class="metric__label">Order accuracy, before qualifying</span>
+            <span class="metric__note">Share of driver pairs placed in the right order</span>
+        </article>
+        <article class="card metric" data-reveal>
+            <span class="metric__value" data-count-to="{{ (post.get('order_accuracy', 0) * 100)|round(1) }}" data-count-decimals="1" data-count-suffix="%">0%</span>
+            <span class="metric__label">Order accuracy, after qualifying</span>
+            <span class="metric__note">Grid order alone scores {{ (grid_base.get('order_accuracy', 0) * 100)|round(1) }}%</span>
+        </article>
+        <article class="card metric" data-reveal>
+            <span class="metric__value" data-count-to="{{ (pre.get('top3_overlap', 0) * 100)|round(0) }}" data-count-suffix="%">0%</span>
+            <span class="metric__label">Podium names correct</span>
+            <span class="metric__note">Average share of the real top three it names</span>
+        </article>
+        <article class="card metric" data-reveal>
+            <span class="metric__value" data-count-to="{{ tested or 0 }}">0</span>
+            <span class="metric__label">Races tested</span>
+            <span class="metric__note">
+                {% if backtest %}Retrained across {{ backtest.get('windows') }} windows of unseen races{% else %}Held out from training{% endif %}
+            </span>
+        </article>
+    </div>
+</section>
+{% endif %}
+
+<section class="section">
+    <div class="card" data-reveal>
+        <div class="card__header">
+            <h2>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
+                </svg>
+                Predict a Grand Prix
+            </h2>
+            {% if ml_ready %}
+            <span class="card__count">Model ready</span>
+            {% endif %}
+        </div>
+        <div class="card__body">
+            {% if not ml_ready %}
+            <div class="notice notice--info">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>
+                </svg>
+                <div>
+                    <h3>The model has not been trained yet</h3>
+                    <p>
+                        Build the dataset and train, then reload this page:
+                        <code>python -m ml.collect_data</code> then <code>python -m ml.train</code>
+                    </p>
+                </div>
+            </div>
+            {% else %}
+            <form action="/predictions" method="get" class="form-row" data-page="races" data-pending="Running model…">
+                {% include "_year_select.html" %}
+                {% include "_round_select.html" %}
+                <button type="submit" class="btn btn--primary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M13 2L3 14h7l-1 8 10-12h-7z"/>
+                    </svg>
+                    Run prediction
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+{% if error_msg %}
+<div class="notice notice--error" data-reveal>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+    </svg>
+    <div>
+        <h3>No prediction for this race</h3>
+        <p>{{ error_msg }}</p>
+    </div>
+</div>
+{% endif %}
+
+{% if predictions %}
+<section class="section">
+    <div class="page-head" style="margin-bottom: 20px">
+        <span class="eyebrow">Predicted finishing order</span>
+        <h1 style="font-size: clamp(24px, 3vw, 34px)">
+            {% if race %}{{ race.event_name }}{% else %}{{ year }} round {{ round }}{% endif %}
+        </h1>
+    </div>
+
+    <div class="chip-row">
+        {% if grid_known %}
+        <span class="chip chip--live">Qualifying is in — real starting grid used</span>
+        {% else %}
+        <span class="chip chip--warn">Before qualifying — starting order estimated from car strength</span>
+        {% endif %}
+        {% if entry_source %}<span class="chip">{{ entry_source }}</span>{% endif %}
+        {% if race and race.date %}<span class="chip">{{ race.date }}</span>{% endif %}
+    </div>
+
+    <div class="podium" data-reveal>
+        {% for p in predictions[:3] %}
+        <article class="podium__slot podium__slot--{{ p.predicted_position }}" style="--team: {{ p.team_color }}">
+            <span class="podium__rank">P{{ p.predicted_position }}</span>
+            <div class="podium__code">{{ p.driver_code }}</div>
+            <div class="podium__driver">{{ p.driver_name }}</div>
+            <div class="podium__team">{{ p.team_name }}</div>
+            <div class="podium__conf">
+                {{ p.podium_chance }}% of the model's front-running weight
+                {% if p.grid_position %} · starts P{{ p.grid_position }}{% endif %}
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+
+    <div class="card" data-reveal>
+        <div class="card__header">
+            <h2>Full predicted order</h2>
+            <span class="card__count">{{ predictions|length }} entries</span>
+        </div>
+        <div class="table-scroll">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Pred</th>
+                        <th>Driver</th>
+                        <th>Team</th>
+                        <th>Confidence</th>
+                        {% if grid_known %}<th>Grid</th><th>Move</th>{% endif %}
+                        <th>Score</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in predictions %}
+                    <tr class="{% if p.predicted_position <= 3 %}is-p{{ p.predicted_position }}{% endif %}">
+                        <td><span class="pos pos--{{ p.predicted_position }}">{{ p.predicted_position }}</span></td>
+                        <td>
+                            <div class="driver">
+                                <div>
+                                    <span class="driver__code" style="color: {{ p.team_color }}">{{ p.driver_code }}</span>
+                                    <span class="driver__name">{{ p.driver_name }}</span>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="team">
+                                {% if p.team_logo %}
+                                <img src="{{ p.team_logo }}" alt="" class="team__logo" loading="lazy" onerror="this.style.display='none'">
+                                {% endif %}
+                                <span class="team__name" style="border-left-color: {{ p.team_color }}">{{ p.team_name }}</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="prediction-row__conf" style="--team: {{ p.team_color }}">
+                                <span class="conf-bar">
+                                    <span class="conf-bar__fill" data-bar-width="{{ [p.podium_chance * 3, 100]|min }}"></span>
+                                </span>
+                                <span class="num">{{ p.podium_chance }}%</span>
+                            </div>
+                        </td>
+                        {% if grid_known %}
+                        <td class="num">{{ p.grid_position or 'no time' }}</td>
+                        <td>
+                            {% if p.grid_delta is not none %}
+                            {% if p.grid_delta > 0 %}
+                            <span class="delta delta--up">▲ {{ p.grid_delta }}</span>
+                            {% elif p.grid_delta < 0 %}
+                            <span class="delta delta--down">▼ {{ -p.grid_delta }}</span>
+                            {% else %}
+                            <span class="delta delta--flat">holds</span>
+                            {% endif %}
+                            {% else %}
+                            <span class="delta delta--flat">—</span>
+                            {% endif %}
+                        </td>
+                        {% endif %}
+                        <td class="num">{{ p.expected_position }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+{% endif %}
+
+<section class="section">
+    <div class="grid grid--3">
+        <article class="card card--hover feature" data-reveal>
+            <div class="feature__icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 20h16M6 16l3-8 3 5 3-9 3 12"/>
+                </svg>
+            </div>
+            <h3>What it reads</h3>
+            <p>Constructor and driver championship position, last three and five finishes, form at this circuit, reliability, and the grid when qualifying has run.</p>
+        </article>
+        <article class="card card--hover feature" data-reveal>
+            <div class="feature__icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+            </div>
+            <h3>No peeking</h3>
+            <p>Features are rebuilt from the championship as it stood after the previous round, so a prediction for an upcoming race uses nothing from the future.</p>
+        </article>
+        <article class="card card--hover feature" data-reveal>
+            <div class="feature__icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="9"/><path d="M12 7v5l4 2"/>
+                </svg>
+            </div>
+            <h3>Honest limits</h3>
+            <p>Safety cars, weather and first-lap contact are not predictable. Read the order as a ranking, not a promise — the score is an expected finishing position.</p>
+        </article>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}Constructor Standings {{ year }} — F1 Analytics Hub{% endblock %}
+{% block nav_constructors %}active{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <span class="eyebrow">World championship</span>
+    <h1>Constructor standings</h1>
+    <p>The teams' table — the strongest single signal in the prediction model.</p>
+</div>
+
+<div class="card" data-reveal style="margin-bottom: 28px">
+    <div class="card__body">
+        <form method="get" action="/standings/constructors" class="form-row" data-autosubmit>
+            {% include "_year_select.html" %}
+            <button type="submit" class="btn btn--primary">View standings</button>
+        </form>
+    </div>
+</div>
+
+{% if error_msg %}
+<div class="notice notice--error" data-reveal>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+    </svg>
+    <div>
+        <h3>Could not load standings</h3>
+        <p>{{ error_msg }}</p>
+    </div>
+</div>
+{% elif standings %}
+{% set leader_points = standings[0].points or 1 %}
+
+<div class="grid grid--3" style="margin-bottom: 26px">
+    {% for s in standings[:3] %}
+    <article class="card card--hover feature" data-reveal style="border-top: 3px solid {{ s.team_color }}">
+        <div class="team" style="margin-bottom: 14px">
+            {% if s.team_logo %}
+            <img src="{{ s.team_logo }}" alt="" class="team__logo team__logo--lg" loading="lazy" onerror="this.style.display='none'">
+            {% endif %}
+            <span class="pos pos--{{ s.position }}">{{ s.position }}</span>
+        </div>
+        <h3 style="color: {{ s.team_color }}">{{ s.team }}</h3>
+        <p>{{ s.points }} points · {{ s.wins }} win{% if s.wins != 1 %}s{% endif %}{% if s.nationality %} · {{ s.nationality }}{% endif %}</p>
+    </article>
+    {% endfor %}
+</div>
+
+<div class="card" data-reveal>
+    <div class="card__header">
+        <h2>{{ year }} constructors' championship</h2>
+        <span class="card__count">{{ standings|length }} teams</span>
+    </div>
+    <div class="table-scroll">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Pos</th>
+                    <th>Constructor</th>
+                    <th>Wins</th>
+                    <th>Share</th>
+                    <th>Pts</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in standings %}
+                <tr class="{% if s.position <= 3 %}is-p{{ s.position }}{% endif %}">
+                    <td><span class="pos pos--{{ s.position }}">{{ s.position }}</span></td>
+                    <td>
+                        <div class="team">
+                            {% if s.team_logo %}
+                            <img src="{{ s.team_logo }}" alt="" class="team__logo team__logo--lg" loading="lazy" onerror="this.style.display='none'">
+                            {% endif %}
+                            <div>
+                                <span class="team__name team__name--lg" style="color: {{ s.team_color }}">{{ s.team }}</span>
+                                <span class="team__meta">{{ s.nationality }}</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="num">{{ s.wins }}</td>
+                    <td>
+                        <span class="bar">
+                            <span class="bar__fill" data-bar-width="{{ (s.points / leader_points * 100)|round(1) }}" style="background: {{ s.team_color }}"></span>
+                        </span>
+                    </td>
+                    <td class="num num--strong">{{ s.points }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="card" data-reveal>
+    <div class="card__body empty">No constructor standings for {{ year }} yet.</div>
+</div>
+{% endif %}
+{% endblock %}

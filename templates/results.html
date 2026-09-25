@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}{% if race %}{{ race.event_name }} {{ year }}{% else %}Results{% endif %} — F1 Analytics Hub{% endblock %}
+{% block nav_results %}active{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div class="breadcrumb">
+        <a href="/">Race results</a>
+        <span>/</span>
+        <span>{% if race %}{{ race.event_name }}{% else %}{{ year }} round {{ round }}{% endif %}</span>
+    </div>
+    <span class="eyebrow">Round {{ round }} · {{ year }}</span>
+    <h1>{% if race %}{{ race.event_name }}{% else %}Round {{ round }}{% endif %}</h1>
+    <p>
+        {% if race %}
+        {{ race.country }}{% if race.location %} · {{ race.location }}{% endif %}{% if race.date %} · {{ race.date }}{% endif %}
+        {% else %}
+        Official race classification
+        {% endif %}
+    </p>
+</div>
+
+{% if error_msg %}
+<div class="notice notice--error" data-reveal>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+    </svg>
+    <div>
+        <h3>Could not load this race</h3>
+        <p>{{ error_msg }}</p>
+        <div class="actions">
+            <a href="/" class="btn btn--primary">Pick another race</a>
+        </div>
+    </div>
+</div>
+{% else %}
+
+{% set podium = positions[:3] %}
+{% if podium %}
+<section class="podium" data-reveal>
+    {% for p in podium %}
+    <article class="podium__slot podium__slot--{{ p.position }}" style="--team: {{ p.team_color }}">
+        <span class="podium__rank">P{{ p.position }}</span>
+        <div class="podium__code">{{ p.driver_code }}</div>
+        <div class="podium__driver">{{ p.driver_name }}</div>
+        <div class="podium__team">{{ p.team }}</div>
+        <div class="podium__conf">
+            {% if p.points is not none %}{{ p.points }} pts{% endif %}
+            {% if p.grid_position %} · from P{{ p.grid_position }}{% endif %}
+        </div>
+    </article>
+    {% endfor %}
+</section>
+{% endif %}
+
+<div class="card" data-reveal>
+    <div class="card__header">
+        <h2>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 15l-2 5l9-11h-5l2-5l-9 11h5z"/>
+            </svg>
+            Classification
+        </h2>
+        <span class="card__count">{{ positions|length }} classified</span>
+    </div>
+    <div class="table-scroll">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Pos</th>
+                    <th>Driver</th>
+                    <th>Team</th>
+                    <th>Grid</th>
+                    <th>Gained</th>
+                    <th>Pts</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in positions %}
+                <tr class="{% if p.position <= 3 %}is-p{{ p.position }}{% endif %}">
+                    <td><span class="pos pos--{{ p.position }}">{{ p.position }}</span></td>
+                    <td>
+                        <div class="driver">
+                            {% if p.headshot_url %}
+                            <img src="{{ p.headshot_url }}" alt="" class="driver__photo" loading="lazy" onerror="this.style.display='none'">
+                            {% endif %}
+                            <div>
+                                <span class="driver__code" style="color: {{ p.team_color }}">{{ p.driver_code }}</span>
+                                <span class="driver__name">{{ p.driver_name }}</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="team">
+                            {% if p.team_logo %}
+                            <img src="{{ p.team_logo }}" alt="" class="team__logo" loading="lazy" onerror="this.style.display='none'">
+                            {% endif %}
+                            <span class="team__name" style="border-left-color: {{ p.team_color }}">{{ p.team }}</span>
+                        </div>
+                    </td>
+                    <td class="num">{{ p.grid_position or '—' }}</td>
+                    <td>
+                        {% if p.grid_position %}
+                        {% set gained = p.grid_position - p.position %}
+                        {% if gained > 0 %}
+                        <span class="delta delta--up">▲ {{ gained }}</span>
+                        {% elif gained < 0 %}
+                        <span class="delta delta--down">▼ {{ -gained }}</span>
+                        {% else %}
+                        <span class="delta delta--flat">held</span>
+                        {% endif %}
+                        {% else %}
+                        <span class="delta delta--flat">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="num num--strong">{{ p.points if p.points is not none else '—' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="actions">
+    <a href="/" class="btn btn--ghost">Back to the finder</a>
+    <a href="/predictions?year={{ year }}" class="btn btn--primary">Predict a race</a>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,21 @@
+<div class="field">
+    <label for="year">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2"/>
+            <path d="M3 10h18M16 2v4M8 2v4"/>
+        </svg>
+        Season
+    </label>
+    <div class="select">
+        <select id="year" name="year" required>
+            {% for y in years %}
+            <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+            {% endfor %}
+        </select>
+        <span class="select__arrow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                <polyline points="6 9 12 15 18 9"/>
+            </svg>
+        </span>
+    </div>
+</div>

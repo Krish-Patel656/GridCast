@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}Driver Standings {{ year }} — F1 Analytics Hub{% endblock %}
+{% block nav_drivers %}active{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <span class="eyebrow">World championship</span>
+    <h1>Driver standings</h1>
+    <p>Points, wins and championship order for any season since {{ years[0] }}.</p>
+</div>
+
+<div class="card" data-reveal style="margin-bottom: 28px">
+    <div class="card__body">
+        <form method="get" action="/standings/drivers" class="form-row" data-autosubmit>
+            {% include "_year_select.html" %}
+            <button type="submit" class="btn btn--primary">View standings</button>
+        </form>
+    </div>
+</div>
+
+{% if error_msg %}
+<div class="notice notice--error" data-reveal>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+    </svg>
+    <div>
+        <h3>Could not load standings</h3>
+        <p>{{ error_msg }}</p>
+    </div>
+</div>
+{% elif standings %}
+{% set leader_points = standings[0].points or 1 %}
+
+<section class="podium" data-reveal>
+    {% for s in standings[:3] %}
+    <article class="podium__slot podium__slot--{{ s.position }}" style="--team: {{ s.team_color }}">
+        <span class="podium__rank">P{{ s.position }}</span>
+        <div class="podium__code">{{ s.driver_code }}</div>
+        <div class="podium__driver">{{ s.driver_name }}</div>
+        <div class="podium__team">{{ s.team }}</div>
+        <div class="podium__conf">{{ s.points }} pts · {{ s.wins }} win{% if s.wins != 1 %}s{% endif %}</div>
+    </article>
+    {% endfor %}
+</section>
+
+<div class="card" data-reveal>
+    <div class="card__header">
+        <h2>{{ year }} drivers' championship</h2>
+        <span class="card__count">{{ standings|length }} drivers</span>
+    </div>
+    <div class="table-scroll">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Pos</th>
+                    <th>Driver</th>
+                    <th>Team</th>
+                    <th>Wins</th>
+                    <th>Share</th>
+                    <th>Pts</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in standings %}
+                <tr class="{% if s.position <= 3 %}is-p{{ s.position }}{% endif %}">
+                    <td><span class="pos pos--{{ s.position }}">{{ s.position }}</span></td>
+                    <td>
+                        <div class="driver">
+                            {% if s.headshot_url %}
+                            <img src="{{ s.headshot_url }}" alt="" class="driver__photo" loading="lazy" onerror="this.style.display='none'">
+                            {% endif %}
+                            <div>
+                                <span class="driver__code" style="color: {{ s.team_color }}">{{ s.driver_code }}</span>
+                                <span class="driver__name">{{ s.driver_name }}</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="team">
+                            {% if s.team_logo %}
+                            <img src="{{ s.team_logo }}" alt="" class="team__logo" loading="lazy" onerror="this.style.display='none'">
+                            {% endif %}
+                            <span class="team__name" style="border-left-color: {{ s.team_color }}">{{ s.team }}</span>
+                        </div>
+                    </td>
+                    <td class="num">{{ s.wins }}</td>
+                    <td>
+                        <span class="bar">
+                            <span class="bar__fill" data-bar-width="{{ (s.points / leader_points * 100)|round(1) }}" style="background: {{ s.team_color }}"></span>
+                        </span>
+                    </td>
+                    <td class="num num--strong">{{ s.points }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="card" data-reveal>
+    <div class="card__body empty">No standings published for {{ year }} yet.</div>
+</div>
+{% endif %}
+{% endblock %}

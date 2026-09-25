@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Schedule {{ year }} — F1 Analytics Hub{% endblock %}
+{% block nav_schedule %}active{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <span class="eyebrow">Calendar</span>
+    <h1>{{ year }} season</h1>
+    <p>Every round with its session times, straight from the official timing schedule.</p>
+</div>
+
+<div class="card" data-reveal style="margin-bottom: 28px">
+    <div class="card__body">
+        <form method="get" action="/schedule" class="form-row" data-autosubmit>
+            {% include "_year_select.html" %}
+            <button type="submit" class="btn btn--primary">View calendar</button>
+        </form>
+    </div>
+</div>
+
+{% if error_msg %}
+<div class="notice notice--error" data-reveal>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+    </svg>
+    <div>
+        <h3>Could not load the calendar</h3>
+        <p>{{ error_msg }}</p>
+    </div>
+</div>
+{% elif events %}
+<div class="schedule-grid">
+    {% for e in events %}
+    <article class="race-card {% if e.is_testing %}race-card--testing{% endif %}" data-reveal>
+        <span class="race-card__round">{% if e.is_testing %}Testing{% else %}Round {{ e.round }}{% endif %}</span>
+        <h3>{{ e.event_name }}</h3>
+        <p class="race-card__place">{{ e.country }}{% if e.location %} · {{ e.location }}{% endif %}</p>
+        {% if e.date %}<p class="race-card__date">{{ e.date }}</p>{% endif %}
+        {% if e.format %}<span class="tag">{{ e.format }}</span>{% endif %}
+        {% if e.sessions %}
+        <ul class="session-list">
+            {% for s in e.sessions %}
+            <li>
+                <span>{{ s.name }}</span>
+                {% if s.date %}<span class="session-date">{{ s.date }}</span>{% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+        {% if not e.is_testing %}
+        <a href="/results?year={{ year }}&round={{ e.round }}" class="race-card__link">View results →</a>
+        <a href="/predictions?year={{ year }}&round={{ e.round }}" class="race-card__link" style="color: var(--cyan); margin-left: 14px">Predict →</a>
+        {% endif %}
+    </article>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
