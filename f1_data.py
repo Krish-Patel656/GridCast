@@ -2,17 +2,31 @@
 
 from __future__ import annotations
 
+import json
+import math
+import re
 from datetime import datetime, timezone
 from functools import lru_cache
+from pathlib import Path
 from typing import Any, Optional
 
 import fastf1
 import fastf1.plotting as fplt
+import numpy as np
 import pandas as pd
 from fastf1.ergast import Ergast
 
 FIRST_SEASON = 2020
 CURRENT_YEAR = datetime.now().year
+
+# Extracted circuit outlines are cached here: tracing one costs a full
+# telemetry session load, and a layout does not change between seasons.
+TRACK_CACHE_DIR = Path("data/processed/tracks")
+
+# Seasons to search for a circuit's shape, newest first.
+GEOMETRY_SEASONS = range(CURRENT_YEAR, 2017, -1)
+
+TRACK_POINTS = 400
 
 # Ergast constructorId / display name -> F1 media logo slug
 CONSTRUCTOR_LOGO_SLUGS: dict[str, str] = {
@@ -528,6 +542,229 @@ def get_drivers_for_race(year: int, round_num: int) -> list[str]:
     session = fastf1.get_session(year, round_num, "R")
     session.load(laps=False, telemetry=False, weather=False, messages=False)
     return sorted(session.results["Abbreviation"].dropna().astype(str).unique().tolist())
+
+
+# --------------------------------------------------------------------------
+# Circuit geometry, for the race simulation
+# --------------------------------------------------------------------------
+
+def _slug(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", str(value).lower()).strip("-") or "unknown"
+
+
+def _editions_of_circuit(location: str) -> list[tuple[int, int]]:
+    """Every (year, round) that visited a location, most recent first."""
+    editions = []
+    for year in GEOMETRY_SEASONS:
+        try:
+            schedule = get_event_schedule(year)
+        except Exception:
+            continue
+        for _, row in schedule.iterrows():
+            if str(row.get("Location", "")) == location:
+                editions.append((year, int(row["RoundNumber"])))
+    return editions
+
+
+def _trace_lap(year: int, round_num: int) -> Optional[dict[str, Any]]:
+    """Outline of one lap, resampled onto an even time grid.
+
+    Even spacing in *time* is what makes an animated car look right: the
+    samples bunch up through corners and spread out down the straights, so a
+    dot stepping through them at a constant rate slows and accelerates the way
+    a car does.
+    """
+    try:
+        session = fastf1.get_session(year, round_num, "R")
+        session.load(telemetry=True, weather=False, messages=False)
+        lap = session.laps.pick_fastest()
+        pos = lap.get_pos_data()
+        if pos is None or len(pos) < 50:
+            return None
+    except Exception:
+        return None
+
+    try:
+        rotation = float(session.get_circuit_info().rotation or 0.0)
+    except Exception:
+        rotation = 0.0
+
+    elapsed = (pos["SessionTime"] - pos["SessionTime"].iloc[0]).dt.total_seconds().to_numpy()
+    grid = np.linspace(elapsed[0], elapsed[-1], TRACK_POINTS)
+    x = np.interp(grid, elapsed, pos["X"].to_numpy(dtype=float))
+    y = np.interp(grid, elapsed, pos["Y"].to_numpy(dtype=float))
+
+    theta = math.radians(rotation)
+    rx = x * math.cos(theta) - y * math.sin(theta)
+    ry = x * math.sin(theta) + y * math.cos(theta)
+    return {"x": rx, "y": ry, "source_year": year}
+
+
+def _corner_outline(location: str) -> Optional[dict[str, Any]]:
+    """Rough loop through the corner apexes, when no lap can be traced."""
+    for year, round_num in _editions_of_circuit(location):
+        try:
+            session = fastf1.get_session(year, round_num, "R")
+            session.load(laps=False, telemetry=False, weather=False, messages=False)
+            info = session.get_circuit_info()
+            corners = info.corners
+            if corners is None or len(corners) < 4:
+                continue
+        except Exception:
+            continue
+
+        theta = math.radians(float(info.rotation or 0.0))
+        cx = corners["X"].to_numpy(dtype=float)
+        cy = corners["Y"].to_numpy(dtype=float)
+        rx = cx * math.cos(theta) - cy * math.sin(theta)
+        ry = cx * math.sin(theta) + cy * math.cos(theta)
+
+        # Close the loop, then smooth it so the apexes read as a circuit
+        # rather than a polygon.
+        loop_x = np.append(rx, rx[0])
+        loop_y = np.append(ry, ry[0])
+        t = np.linspace(0, 1, len(loop_x))
+        fine = np.linspace(0, 1, TRACK_POINTS)
+        sx = np.interp(fine, t, loop_x)
+        sy = np.interp(fine, t, loop_y)
+        for _ in range(28):
+            sx = np.convolve(np.r_[sx[-3:], sx, sx[:3]], np.ones(7) / 7, mode="same")[3:-3]
+            sy = np.convolve(np.r_[sy[-3:], sy, sy[:3]], np.ones(7) / 7, mode="same")[3:-3]
+        return {"x": sx, "y": sy, "source_year": year}
+    return None
+
+
+def _schematic_outline(location: str) -> dict[str, Any]:
+    """A plausible closed circuit for a venue with no published geometry.
+
+    Debut circuits have neither telemetry nor corner data, and an empty canvas
+    is worse than an honest placeholder, so the shape is built from a few
+    harmonics seeded by the venue name: stable for a given circuit, clearly
+    labelled in the UI, and never passed off as the real layout.
+    """
+    rng = np.random.default_rng(abs(hash(location)) % (2**32))
+    angle = np.linspace(0, 2 * math.pi, TRACK_POINTS)
+    radius = np.ones_like(angle)
+    for harmonic in (2, 3, 4, 5, 7):
+        radius += rng.uniform(0.04, 0.17) * np.sin(harmonic * angle + rng.uniform(0, 2 * math.pi))
+    return {
+        "x": radius * np.cos(angle),
+        "y": radius * np.sin(angle) * 0.72,
+        "source_year": None,
+    }
+
+
+def _normalised_points(x: np.ndarray, y: np.ndarray) -> list[list[float]]:
+    """Fit the outline into a 1000-unit box, keeping its proportions."""
+    width = max(float(x.max() - x.min()), 1.0)
+    height = max(float(y.max() - y.min()), 1.0)
+    scale = 1000.0 / max(width, height)
+    off_x = (1000.0 - width * scale) / 2.0
+    off_y = (1000.0 - height * scale) / 2.0
+    return [
+        [
+            round((float(px) - float(x.min())) * scale + off_x, 1),
+            # SVG y grows downward, so flip to keep the real orientation.
+            round(1000.0 - ((float(py) - float(y.min())) * scale + off_y), 1),
+        ]
+        for px, py in zip(x, y)
+    ]
+
+
+@lru_cache(maxsize=32)
+def get_circuit_path(year: int, round_num: int) -> dict[str, Any]:
+    """Normalised outline of a circuit for the simulation canvas.
+
+    Tries the race itself first, then earlier visits to the same location: the
+    2026 sessions have no position telemetry archived, but the circuits are
+    unchanged, so a lap from a previous season draws the same track.
+    """
+    race = get_race_info(year, round_num) or {}
+    location = str(race.get("location") or race.get("country") or f"{year}-{round_num}")
+    cache_file = TRACK_CACHE_DIR / f"{_slug(location)}.json"
+
+    if cache_file.exists():
+        try:
+            return json.loads(cache_file.read_text())
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    traced = _trace_lap(year, round_num)
+    kind = "lap"
+    if traced is None:
+        for alt_year, alt_round in _editions_of_circuit(location):
+            if (alt_year, alt_round) == (year, round_num):
+                continue
+            traced = _trace_lap(alt_year, alt_round)
+            if traced is not None:
+                break
+    if traced is None:
+        traced = _corner_outline(location)
+        kind = "corners"
+    if traced is None:
+        traced = _schematic_outline(location)
+        kind = "schematic"
+
+    notes = {
+        "lap": f"Traced from a real lap at {location} in {traced['source_year']}.",
+        "corners": f"Drawn from the surveyed corner positions at {location}.",
+        "schematic": (
+            f"No layout has been published for {location} yet, so this is a "
+            "placeholder shape — the race simulation itself is unaffected."
+        ),
+    }
+
+    result = {
+        "location": location,
+        "points": _normalised_points(traced["x"], traced["y"]),
+        "kind": kind,
+        "source_year": traced["source_year"],
+        "note": notes[kind],
+    }
+
+    try:
+        TRACK_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        cache_file.write_text(json.dumps(result))
+    except OSError:
+        pass
+    return result
+
+
+@lru_cache(maxsize=64)
+def get_pace_reference(year: int, round_num: int) -> dict[str, Any]:
+    """Race length and representative lap time, for scaling the simulation.
+
+    Uses the race itself when it has run, otherwise the most recent earlier
+    visit to the same circuit.
+    """
+    race = get_race_info(year, round_num) or {}
+    location = str(race.get("location") or "")
+
+    candidates = [(year, round_num)]
+    candidates += [e for e in _editions_of_circuit(location) if e != (year, round_num)]
+
+    for cand_year, cand_round in candidates[:4]:
+        try:
+            session = fastf1.get_session(cand_year, cand_round, "R")
+            session.load(telemetry=False, weather=False, messages=False)
+            times = session.laps["LapTime"].dropna()
+            total_laps = _safe_int(session.laps["LapNumber"].max())
+            if not len(times) or not total_laps:
+                continue
+            # The 20th percentile approximates green-flag race pace: quick
+            # enough to exclude pit and safety car laps, slow enough not to be
+            # one driver's single best lap.
+            base = float(pd.Timedelta(times.quantile(0.2)).total_seconds())
+            return {
+                "laps": int(total_laps),
+                "base_lap": round(base, 3),
+                "source_year": cand_year,
+                "is_estimate": (cand_year, cand_round) != (year, round_num),
+            }
+        except Exception:
+            continue
+
+    return {"laps": 57, "base_lap": 92.0, "source_year": None, "is_estimate": True}
 
 
 def _normalize_hex(color: str) -> str:

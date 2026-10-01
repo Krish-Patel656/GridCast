@@ -8,6 +8,7 @@ cache/
 # ML artifacts (regenerate locally)
 data/processed/*.csv
 data/processed/*.json
+data/processed/tracks/
 data/processed/*.joblib
 models/*.pt
 models/metadata.json
