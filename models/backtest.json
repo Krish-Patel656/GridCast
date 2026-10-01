@@ -1,0 +1,187 @@
+{
+  "windows": 4,
+  "window_size": 20,
+  "races_evaluated": 80,
+  "post_quali": {
+    "order_accuracy": 0.7802,
+    "spearman": 0.6922,
+    "top3_overlap": 0.675,
+    "top10_overlap": 0.8087,
+    "winner_hit": 0.65,
+    "mean_rank_error": 3.1686
+  },
+  "pre_quali": {
+    "order_accuracy": 0.7347,
+    "spearman": 0.6079,
+    "top3_overlap": 0.5167,
+    "top10_overlap": 0.755,
+    "winner_hit": 0.3875,
+    "mean_rank_error": 3.8115
+  },
+  "grid_baseline": {
+    "order_accuracy": 0.7654,
+    "spearman": 0.6613,
+    "top3_overlap": 0.6708,
+    "top10_overlap": 0.7825,
+    "winner_hit": 0.5875,
+    "mean_rank_error": 3.3164
+  },
+  "pace_prior_baseline": {
+    "order_accuracy": 0.7217,
+    "spearman": 0.5831,
+    "top3_overlap": 0.4792,
+    "top10_overlap": 0.7538,
+    "winner_hit": 0.2125,
+    "mean_rank_error": 3.9615
+  },
+  "folds": [
+    {
+      "window": "2023 R4 to 2024 R1",
+      "train_races": 185,
+      "val_races": 20,
+      "post_quali": {
+        "order_accuracy": 0.7842,
+        "spearman": 0.6998,
+        "top3_overlap": 0.6167,
+        "top10_overlap": 0.825,
+        "winner_hit": 0.85,
+        "mean_rank_error": 3.055
+      },
+      "pre_quali": {
+        "order_accuracy": 0.7542,
+        "spearman": 0.6415,
+        "top3_overlap": 0.55,
+        "top10_overlap": 0.795,
+        "winner_hit": 0.9,
+        "mean_rank_error": 3.46
+      },
+      "grid_baseline": {
+        "order_accuracy": 0.7403,
+        "spearman": 0.6156,
+        "top3_overlap": 0.6167,
+        "top10_overlap": 0.755,
+        "winner_hit": 0.6,
+        "mean_rank_error": 3.62
+      },
+      "pace_prior_baseline": {
+        "order_accuracy": 0.7311,
+        "spearman": 0.6042,
+        "top3_overlap": 0.55,
+        "top10_overlap": 0.8,
+        "winner_hit": 0.05,
+        "mean_rank_error": 3.77
+      }
+    },
+    {
+      "window": "2024 R2 to 2024 R21",
+      "train_races": 205,
+      "val_races": 20,
+      "post_quali": {
+        "order_accuracy": 0.8064,
+        "spearman": 0.7544,
+        "top3_overlap": 0.7167,
+        "top10_overlap": 0.85,
+        "winner_hit": 0.4,
+        "mean_rank_error": 2.8463
+      },
+      "pre_quali": {
+        "order_accuracy": 0.7422,
+        "spearman": 0.636,
+        "top3_overlap": 0.4,
+        "top10_overlap": 0.78,
+        "winner_hit": 0.35,
+        "mean_rank_error": 3.6634
+      },
+      "grid_baseline": {
+        "order_accuracy": 0.8019,
+        "spearman": 0.7382,
+        "top3_overlap": 0.7,
+        "top10_overlap": 0.835,
+        "winner_hit": 0.4,
+        "mean_rank_error": 2.8647
+      },
+      "pace_prior_baseline": {
+        "order_accuracy": 0.7443,
+        "spearman": 0.6371,
+        "top3_overlap": 0.35,
+        "top10_overlap": 0.785,
+        "winner_hit": 0.05,
+        "mean_rank_error": 3.6513
+      }
+    },
+    {
+      "window": "2024 R22 to 2025 R17",
+      "train_races": 225,
+      "val_races": 20,
+      "post_quali": {
+        "order_accuracy": 0.7581,
+        "spearman": 0.6579,
+        "top3_overlap": 0.7333,
+        "top10_overlap": 0.8,
+        "winner_hit": 0.65,
+        "mean_rank_error": 3.2937
+      },
+      "pre_quali": {
+        "order_accuracy": 0.7056,
+        "spearman": 0.5527,
+        "top3_overlap": 0.5833,
+        "top10_overlap": 0.735,
+        "winner_hit": 0.25,
+        "mean_rank_error": 4.1211
+      },
+      "grid_baseline": {
+        "order_accuracy": 0.7568,
+        "spearman": 0.6545,
+        "top3_overlap": 0.7333,
+        "top10_overlap": 0.79,
+        "winner_hit": 0.65,
+        "mean_rank_error": 3.3082
+      },
+      "pace_prior_baseline": {
+        "order_accuracy": 0.6841,
+        "spearman": 0.5024,
+        "top3_overlap": 0.5167,
+        "top10_overlap": 0.725,
+        "winner_hit": 0.3,
+        "mean_rank_error": 4.3537
+      }
+    },
+    {
+      "window": "2025 R18 to 2026 R13",
+      "train_races": 245,
+      "val_races": 20,
+      "post_quali": {
+        "order_accuracy": 0.7722,
+        "spearman": 0.6568,
+        "top3_overlap": 0.6333,
+        "top10_overlap": 0.76,
+        "winner_hit": 0.7,
+        "mean_rank_error": 3.4795
+      },
+      "pre_quali": {
+        "order_accuracy": 0.7367,
+        "spearman": 0.6015,
+        "top3_overlap": 0.5333,
+        "top10_overlap": 0.71,
+        "winner_hit": 0.05,
+        "mean_rank_error": 4.0014
+      },
+      "grid_baseline": {
+        "order_accuracy": 0.7625,
+        "spearman": 0.6369,
+        "top3_overlap": 0.6333,
+        "top10_overlap": 0.75,
+        "winner_hit": 0.7,
+        "mean_rank_error": 3.4727
+      },
+      "pace_prior_baseline": {
+        "order_accuracy": 0.7274,
+        "spearman": 0.5887,
+        "top3_overlap": 0.5,
+        "top10_overlap": 0.705,
+        "winner_hit": 0.45,
+        "mean_rank_error": 4.0709
+      }
+    }
+  ]
+}
