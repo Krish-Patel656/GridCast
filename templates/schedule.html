@@ -51,6 +51,7 @@
         {% if not e.is_testing %}
         <a href="/results?year={{ year }}&round={{ e.round }}" class="race-card__link">View results →</a>
         <a href="/predictions?year={{ year }}&round={{ e.round }}" class="race-card__link" style="color: var(--cyan); margin-left: 14px">Predict →</a>
+        <a href="/simulation?year={{ year }}&round={{ e.round }}" class="race-card__link" style="color: var(--amber); margin-left: 14px">Simulate →</a>
         {% endif %}
     </article>
     {% endfor %}
