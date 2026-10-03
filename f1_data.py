@@ -28,6 +28,20 @@ GEOMETRY_SEASONS = range(CURRENT_YEAR, 2017, -1)
 
 TRACK_POINTS = 400
 
+# Published outlines (github.com/bacinger/f1-circuits, MIT) for venues with no
+# position telemetry: circuits last raced before 2018, and debut circuits.
+CIRCUIT_OUTLINE_DIR = Path("data/circuits")
+CIRCUIT_OUTLINES = {
+    "Kuala Lumpur": "my-1999",
+    "Sepang": "my-1999",
+    "Madrid": "es-2026",
+}
+
+# Grand Prix distance and a typical green-flag average speed, for estimating
+# race length and lap time from a circuit's length alone.
+RACE_DISTANCE_M = 305_000
+TYPICAL_RACE_SPEED_KMH = 205.0
+
 # Ergast constructorId / display name -> F1 media logo slug
 CONSTRUCTOR_LOGO_SLUGS: dict[str, str] = {
     "red_bull": "red-bull",
@@ -552,17 +566,36 @@ def _slug(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", str(value).lower()).strip("-") or "unknown"
 
 
-def _editions_of_circuit(location: str) -> list[tuple[int, int]]:
-    """Every (year, round) that visited a location, most recent first."""
+@lru_cache(maxsize=16)
+def _circuit_ids(year: int) -> dict[int, str]:
+    """Round number to Ergast circuit id for one season."""
+    try:
+        schedule = Ergast().get_race_schedule(year)
+    except Exception:
+        return {}
+    return {int(row["round"]): str(row["circuitId"]) for _, row in schedule.iterrows()}
+
+
+def _editions_of_circuit(year: int, round_num: int, location: str) -> list[tuple[int, int]]:
+    """Every (year, round) held at the same circuit, most recent first.
+
+    Matched on Ergast's circuit id, because FastF1's location names drift
+    between seasons (Yas Marina and Yas Island, Monaco and Monte Carlo).
+    Falls back to the location name when the id is unavailable.
+    """
+    circuit = _circuit_ids(year).get(round_num)
     editions = []
-    for year in GEOMETRY_SEASONS:
+    for season in GEOMETRY_SEASONS:
+        if circuit:
+            editions += [(season, rnd) for rnd, cid in _circuit_ids(season).items() if cid == circuit]
+            continue
         try:
-            schedule = get_event_schedule(year)
+            schedule = get_event_schedule(season)
         except Exception:
             continue
         for _, row in schedule.iterrows():
             if str(row.get("Location", "")) == location:
-                editions.append((year, int(row["RoundNumber"])))
+                editions.append((season, int(row["RoundNumber"])))
     return editions
 
 
@@ -600,9 +633,70 @@ def _trace_lap(year: int, round_num: int) -> Optional[dict[str, Any]]:
     return {"x": rx, "y": ry, "source_year": year}
 
 
-def _corner_outline(location: str) -> Optional[dict[str, Any]]:
+def _outline_feature(location: str) -> Optional[dict[str, Any]]:
+    name = CIRCUIT_OUTLINES.get(location)
+    if not name:
+        return None
+    try:
+        return json.loads((CIRCUIT_OUTLINE_DIR / f"{name}.geojson").read_text())["features"][0]
+    except (OSError, KeyError, IndexError, json.JSONDecodeError):
+        return None
+
+
+def _circular_smooth(values: np.ndarray, window: int) -> np.ndarray:
+    pad = window // 2
+    wrapped = np.r_[values[-pad:], values, values[:pad]]
+    return np.convolve(wrapped, np.ones(window) / window, mode="same")[pad:-pad]
+
+
+def _published_outline(location: str) -> Optional[dict[str, Any]]:
+    """A circuit's surveyed layout, resampled onto an estimated time grid.
+
+    The outline is only a line, with no timing, so corner speeds come from its
+    shape: a car can take a bend no faster than its grip allows for that
+    radius. Resampling on the resulting time grid makes cars brake into corners
+    the same way they do on the telemetry-traced circuits.
+    """
+    feature = _outline_feature(location)
+    if feature is None:
+        return None
+
+    coords = np.asarray(feature["geometry"]["coordinates"], dtype=float)
+    lon, lat = coords[:, 0], coords[:, 1]
+    # An equirectangular projection is exact enough across a few kilometres.
+    metres_per_degree = 111_320.0
+    x = (lon - lon.mean()) * math.cos(math.radians(lat.mean())) * metres_per_degree
+    y = (lat - lat.mean()) * metres_per_degree
+
+    distance = np.r_[0.0, np.cumsum(np.hypot(np.diff(x), np.diff(y)))]
+    samples = TRACK_POINTS * 4
+    even = np.linspace(0.0, distance[-1], samples, endpoint=False)
+    fx = _circular_smooth(np.interp(even, distance, x), 9)
+    fy = _circular_smooth(np.interp(even, distance, y), 9)
+
+    step = distance[-1] / samples
+    heading = np.unwrap(np.arctan2(np.gradient(fy), np.gradient(fx)))
+    curvature = _circular_smooth(np.abs(np.gradient(heading)) / step, 15)
+
+    # v = sqrt(lateral grip / curvature), capped at top speed.
+    top_speed, lateral_grip = 90.0, 40.0
+    speed = np.minimum(top_speed, np.sqrt(lateral_grip / np.maximum(curvature, 1e-6)))
+    speed = _circular_smooth(speed, 25)
+
+    elapsed = np.r_[0.0, np.cumsum(step / speed)]
+    loop_x, loop_y = np.r_[fx, fx[0]], np.r_[fy, fy[0]]
+    grid = np.linspace(0.0, elapsed[-1], TRACK_POINTS)
+    return {
+        "x": np.interp(grid, elapsed, loop_x),
+        "y": np.interp(grid, elapsed, loop_y),
+        "source_year": None,
+        "name": feature["properties"].get("Name") or location,
+    }
+
+
+def _corner_outline(editions: list[tuple[int, int]]) -> Optional[dict[str, Any]]:
     """Rough loop through the corner apexes, when no lap can be traced."""
-    for year, round_num in _editions_of_circuit(location):
+    for year, round_num in editions:
         try:
             session = fastf1.get_session(year, round_num, "R")
             session.load(laps=False, telemetry=False, weather=False, messages=False)
@@ -689,17 +783,21 @@ def get_circuit_path(year: int, round_num: int) -> dict[str, Any]:
         except (json.JSONDecodeError, OSError):
             pass
 
+    editions = _editions_of_circuit(year, round_num, location)
     traced = _trace_lap(year, round_num)
     kind = "lap"
     if traced is None:
-        for alt_year, alt_round in _editions_of_circuit(location):
+        for alt_year, alt_round in editions:
             if (alt_year, alt_round) == (year, round_num):
                 continue
             traced = _trace_lap(alt_year, alt_round)
             if traced is not None:
                 break
     if traced is None:
-        traced = _corner_outline(location)
+        traced = _published_outline(location)
+        kind = "outline"
+    if traced is None:
+        traced = _corner_outline(editions)
         kind = "corners"
     if traced is None:
         traced = _schematic_outline(location)
@@ -707,6 +805,10 @@ def get_circuit_path(year: int, round_num: int) -> dict[str, Any]:
 
     notes = {
         "lap": f"Traced from a real lap at {location} in {traced['source_year']}.",
+        "outline": (
+            f"Real layout of {traced.get('name', location)}. No timed lap exists "
+            "here yet, so corner speeds are estimated from the shape of the track."
+        ),
         "corners": f"Drawn from the surveyed corner positions at {location}.",
         "schematic": (
             f"No layout has been published for {location} yet, so this is a "
@@ -722,11 +824,13 @@ def get_circuit_path(year: int, round_num: int) -> dict[str, Any]:
         "note": notes[kind],
     }
 
-    try:
-        TRACK_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        cache_file.write_text(json.dumps(result))
-    except OSError:
-        pass
+    # A placeholder is not cached, so real geometry is picked up once it exists.
+    if kind != "schematic":
+        try:
+            TRACK_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+            cache_file.write_text(json.dumps(result))
+        except OSError:
+            pass
     return result
 
 
@@ -741,7 +845,7 @@ def get_pace_reference(year: int, round_num: int) -> dict[str, Any]:
     location = str(race.get("location") or "")
 
     candidates = [(year, round_num)]
-    candidates += [e for e in _editions_of_circuit(location) if e != (year, round_num)]
+    candidates += [e for e in _editions_of_circuit(year, round_num, location) if e != (year, round_num)]
 
     for cand_year, cand_round in candidates[:4]:
         try:
@@ -760,11 +864,29 @@ def get_pace_reference(year: int, round_num: int) -> dict[str, Any]:
                 "base_lap": round(base, 3),
                 "source_year": cand_year,
                 "is_estimate": (cand_year, cand_round) != (year, round_num),
+                "source_label": f"Pace reference from {cand_year}",
             }
         except Exception:
             continue
 
-    return {"laps": 57, "base_lap": 92.0, "source_year": None, "is_estimate": True}
+    feature = _outline_feature(location)
+    length = (feature or {}).get("properties", {}).get("length")
+    if length:
+        return {
+            "laps": math.ceil(RACE_DISTANCE_M / length),
+            "base_lap": round(length / (TYPICAL_RACE_SPEED_KMH / 3.6), 3),
+            "source_year": None,
+            "is_estimate": True,
+            "source_label": f"Pace estimated from the {length / 1000:.3f} km lap",
+        }
+
+    return {
+        "laps": 57,
+        "base_lap": 92.0,
+        "source_year": None,
+        "is_estimate": True,
+        "source_label": "Generic race pace",
+    }
 
 
 def _normalize_hex(color: str) -> str:
