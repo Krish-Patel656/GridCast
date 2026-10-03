@@ -27,8 +27,24 @@ into `cache/`, so give it a moment; everything after that is served from disk.
 | `/schedule` | Every round of a season with its session times |
 | `/telemetry` | Fastest lap and sectors, a lap-by-lap trace, the speed trace when it was archived, and tyre stints |
 | `/predictions` | Model-ranked finishing order, plus its measured accuracy |
+| `/simulation` | The predicted order raced lap by lap on the real circuit, with tyres, pit stops and a live leaderboard |
 
-JSON is available at `/get_races`, `/get_race_drivers` and `/api/predictions`.
+JSON is available at `/get_races`, `/get_race_drivers`, `/api/predictions` and
+`/api/simulation`.
+
+## Race simulation
+
+Each driver's pace comes from the model's expected finishing position, then the
+race is run lap by lap with race-day form, tyre wear, fuel burn-off, pit stops
+and cars that have to actually complete an overtake. The page shows the most
+typical of 40 runs alongside each driver's win chance; "Race it again" runs a
+fresh one.
+
+Circuits are traced from a real lap's position telemetry, borrowing an earlier
+season's lap when the race has not been archived. Venues with no telemetry at
+all (Sepang, last raced in 2017, and the new Madrid circuit) use the published
+layouts in `data/circuits/`, from
+[bacinger/f1-circuits](https://github.com/bacinger/f1-circuits) (MIT).
 
 ## The model
 
@@ -60,9 +76,10 @@ python -m ml.backtest         # optional: refresh the accuracy figures
 ```
 main.py             routes and page rendering
 f1_data.py          FastF1 / Ergast access, team colours and logos
-ml/                 dataset, features, model, training, backtest, prediction
+ml/                 dataset, features, model, training, backtest, prediction, race simulation
 templates/          Jinja2 templates
-static/             styles and the motion/parallax script
+static/             styles, the motion/parallax script and the simulation player
+data/circuits/      published layouts for circuits without telemetry
 data/, models/      generated dataset, encoders and checkpoints
 cache/              FastF1's own download cache
 ```
