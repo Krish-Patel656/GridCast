@@ -16,6 +16,7 @@ Nothing here feeds the model. It is a presentation layer over its output.
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
@@ -28,8 +29,10 @@ import numpy as np
 PACE_PER_POSITION = 0.0013
 
 # How much a driver's race-day form can differ from their predicted level. This
-# is what lets the simulation disagree with the model.
-FORM_SPREAD = 0.0035
+# is what lets the simulation disagree with the model. Form holds for the whole
+# race, so it compounds over every lap; too much and one bad draw sends the
+# predicted winner down the order.
+FORM_SPREAD = 0.002
 
 # Lap-to-lap inconsistency for a single driver.
 LAP_NOISE = 0.0022
@@ -216,6 +219,42 @@ def simulate_race(
     }
 
 
+def win_odds(races: list[dict[str, Any]], top: int = 5) -> list[dict[str, Any]]:
+    """Share of races each driver won, most likely first."""
+    wins = Counter(race["results"][0]["driver_code"] for race in races)
+    return [
+        {"driver_code": code, "share": round(100 * count / len(races), 1)}
+        for code, count in wins.most_common(top)
+    ]
+
+
+def typical_race(
+    predictions: list[dict[str, Any]],
+    *,
+    laps: int,
+    base_lap: float,
+    seed: int,
+    runs: int = 40,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """The run that best represents the prediction, plus the field's win odds.
+
+    Any single seed can land on an outlier, which reads as the simulation
+    contradicting the model. Racing it many times and showing the most typical
+    run keeps the default view faithful; the odds say how often it goes
+    differently.
+    """
+    races = [
+        simulate_race(predictions, laps=laps, base_lap=base_lap, seed=seed + i)
+        for i in range(runs)
+    ]
+
+    def distance(race: dict[str, Any]) -> tuple[bool, float]:
+        agreement = order_agreement(race["results"])
+        return (not agreement["winner_as_predicted"], agreement["mean_shift"])
+
+    return min(races, key=distance), win_odds(races)
+
+
 def _format_duration(seconds: float) -> str:
     """Winning time the way a classification shows it: h:mm:ss.sss."""
     hours, rest = divmod(seconds, 3600)
@@ -244,4 +283,4 @@ def order_agreement(simulated: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-__all__ = ["simulate_race", "order_agreement", "SimDriver"]
+__all__ = ["simulate_race", "typical_race", "win_odds", "order_agreement", "SimDriver"]

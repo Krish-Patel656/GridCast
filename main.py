@@ -329,7 +329,7 @@ def api_predictions(year: int = Query(...), round: int = Query(...)):
 
 def _build_simulation(year: int, round_num: int, seed: Optional[int]) -> dict[str, Any]:
     """Predicted order turned into one lap-by-lap race on the real circuit."""
-    from ml.simulate import order_agreement, simulate_race
+    from ml.simulate import order_agreement, simulate_race, typical_race
 
     prediction = _get_predictor().predict_race(year, round_num)
     entries = prediction.get("predictions") or []
@@ -337,16 +337,25 @@ def _build_simulation(year: int, round_num: int, seed: Optional[int]) -> dict[st
         raise ValueError("No pre-race entry list is available for this Grand Prix yet.")
 
     pace = f1_data.get_pace_reference(year, round_num)
-    # A seed tied to the race keeps a page reload showing the same race; the
+    runs = 40
+    # Seeds tied to the race keep a page reload showing the same race; the
     # re-run link supplies a fresh one.
-    resolved_seed = seed if seed is not None else year * 1000 + round_num
-
-    simulation = simulate_race(
+    typical, odds = typical_race(
         entries,
         laps=pace["laps"],
         base_lap=pace["base_lap"],
-        seed=resolved_seed,
+        seed=year * 1000 + round_num,
+        runs=runs,
     )
+    if seed is None:
+        simulation = typical
+    else:
+        simulation = simulate_race(
+            entries,
+            laps=pace["laps"],
+            base_lap=pace["base_lap"],
+            seed=seed,
+        )
 
     actual = None
     try:
@@ -364,6 +373,9 @@ def _build_simulation(year: int, round_num: int, seed: Optional[int]) -> dict[st
         "track": f1_data.get_circuit_path(year, round_num),
         "pace": pace,
         "simulation": simulation,
+        "typical": seed is None,
+        "runs": runs,
+        "win_odds": odds,
         "agreement": order_agreement(simulation.get("results", [])),
         "predicted_order": [
             {

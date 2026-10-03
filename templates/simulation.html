@@ -16,7 +16,7 @@
         <p class="hero__lead">
             The model's predicted order sets each driver's pace, then a full Grand Prix is run on the
             real circuit — tyres going off, pit stops, and cars stuck behind cars they are quicker than.
-            Run it again and you get a different race.
+            You see the most typical of many runs; race it again for a different outcome.
         </p>
         <div class="hero__actions">
             <a href="/predictions{% if round %}?year={{ year }}&round={{ round }}{% endif %}" class="btn btn--ghost">
@@ -78,10 +78,20 @@
         <span class="chip chip--warn">Before qualifying — grid estimated from car strength</span>
         {% endif %}
         {% if payload.pace.is_estimate %}
-        <span class="chip">Pace reference from {{ payload.pace.source_year }}</span>
+        <span class="chip">{{ payload.pace.source_label }}</span>
         {% endif %}
-        <span class="chip">Seed {{ sim.seed }}</span>
+        {% if payload.typical %}
+        <span class="chip">Most typical of {{ payload.runs }} simulated races</span>
+        {% else %}
+        <span class="chip">Re-run · seed {{ sim.seed }}</span>
+        {% endif %}
     </div>
+    {% if payload.win_odds %}
+    <p class="hint" style="margin-top: 12px">
+        Win chance across {{ payload.runs }} races:
+        {% for o in payload.win_odds %}<strong>{{ o.driver_code }}</strong> {{ o.share | round | int }}%{% if not loop.last %} · {% endif %}{% endfor %}
+    </p>
+    {% endif %}
 </div>
 
 <div class="sim" data-reveal>
