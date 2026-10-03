@@ -10,6 +10,7 @@ FastAPI runs them on its worker threadpool instead of stalling the event loop.
 from __future__ import annotations
 
 import os
+import random
 import threading
 from typing import Any, Optional
 
@@ -320,5 +321,114 @@ def api_predictions(year: int = Query(...), round: int = Query(...)):
         return JSONResponse(content={"error": "Model not trained"}, status_code=503)
     try:
         return JSONResponse(content=_get_predictor().predict_race(year, round))
+    except Exception as exc:
+        return JSONResponse(content={"error": str(exc)}, status_code=400)
+
+
+# ----- Race simulation -----
+
+def _build_simulation(year: int, round_num: int, seed: Optional[int]) -> dict[str, Any]:
+    """Predicted order turned into one lap-by-lap race on the real circuit."""
+    from ml.simulate import order_agreement, simulate_race
+
+    prediction = _get_predictor().predict_race(year, round_num)
+    entries = prediction.get("predictions") or []
+    if not entries:
+        raise ValueError("No pre-race entry list is available for this Grand Prix yet.")
+
+    pace = f1_data.get_pace_reference(year, round_num)
+    # A seed tied to the race keeps a page reload showing the same race; the
+    # re-run link supplies a fresh one.
+    resolved_seed = seed if seed is not None else year * 1000 + round_num
+
+    simulation = simulate_race(
+        entries,
+        laps=pace["laps"],
+        base_lap=pace["base_lap"],
+        seed=resolved_seed,
+    )
+
+    actual = None
+    try:
+        results = f1_data.get_race_results(year, round_num)
+        actual = {
+            row["driver_code"]: row["position"]
+            for row in results.get("positions", [])
+            if row.get("driver_code")
+        } or None
+    except Exception:
+        actual = None
+
+    return {
+        "race": f1_data.get_race_info(year, round_num),
+        "track": f1_data.get_circuit_path(year, round_num),
+        "pace": pace,
+        "simulation": simulation,
+        "agreement": order_agreement(simulation.get("results", [])),
+        "predicted_order": [
+            {
+                "position": entry["predicted_position"],
+                "driver_code": entry["driver_code"],
+                "driver_name": entry["driver_name"],
+                "team_color": entry["team_color"],
+            }
+            for entry in entries
+        ],
+        "actual_positions": actual,
+        "grid_known": prediction.get("grid_known", False),
+        "entry_source": prediction.get("source_label"),
+    }
+
+
+@app.get("/simulation", response_class=HTMLResponse)
+def simulation_page(
+    request: Request,
+    year: Optional[int] = Query(default=None),
+    round: Optional[int] = Query(default=None),
+    seed: Optional[int] = Query(default=None),
+):
+    status = _ml_status()
+    years = f1_data.get_available_years()
+    selected_year = _parse_year(str(year) if year else None, years)
+
+    payload: dict[str, Any] = {}
+    error_msg = None
+
+    if round is not None:
+        if not status.get("ready"):
+            error_msg = (
+                "The model has not been trained yet. Run: "
+                "python -m ml.collect_data && python -m ml.train"
+            )
+        else:
+            try:
+                payload = _build_simulation(selected_year, round, seed)
+            except Exception as exc:
+                error_msg = str(exc)
+
+    return templates.TemplateResponse(
+        "simulation.html",
+        {
+            "request": request,
+            "ml_ready": status.get("ready", False),
+            "round": round,
+            "payload": payload,
+            "next_seed": random.randint(1, 10**6),
+            "error_msg": error_msg,
+            **_predictions_context(selected_year, round),
+        },
+    )
+
+
+@app.get("/api/simulation")
+def api_simulation(
+    year: int = Query(...),
+    round: int = Query(...),
+    seed: Optional[int] = Query(default=None),
+):
+    if not _ml_status().get("ready"):
+        return JSONResponse(content={"error": "Model not trained"}, status_code=503)
+    try:
+        return JSONResponse(content=_build_simulation(year, round, seed))
     except Exception as exc:
         return JSONResponse(content={"error": str(exc)}, status_code=400)
