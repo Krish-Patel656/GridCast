@@ -22,12 +22,12 @@
     const laps = data.laps;
     const leader = drivers[0];
 
-    /* 1x plays the whole race in about two minutes. */
-    const BASE_COMPRESSION = data.raceTime / 120;
+    /* 1x plays the whole race in about eight minutes, roughly 9 s per lap. */
+    const BASE_COMPRESSION = data.raceTime / 480;
 
     const state = {
         time: 0,
-        speed: 2,
+        speed: 1,
         playing: false,
         lastFrame: 0,
     };

@@ -132,7 +132,7 @@
 
             <div class="sim__speeds" role="group" aria-label="Playback speed">
                 {% for mult in [1, 2, 4, 8] %}
-                <button type="button" class="sim__speed{% if mult == 2 %} is-active{% endif %}" data-sim-speed="{{ mult }}">
+                <button type="button" class="sim__speed{% if mult == 1 %} is-active{% endif %}" data-sim-speed="{{ mult }}">
                     {{ mult }}×
                 </button>
                 {% endfor %}
@@ -290,6 +290,6 @@
     "track": payload.track.points,
     "drivers": payload.simulation.results
 } | tojson }}</script>
-<script src="/static/js/simulation.js?v=5"></script>
+<script src="/static/js/simulation.js?v=6"></script>
 {% endif %}
 {% endblock %}
