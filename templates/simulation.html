@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+
+{% block title %}Race Simulation — F1 Analytics Hub{% endblock %}
+{% block nav_simulation %}active{% endblock %}
+
+{% block content %}
+{% set sim = payload.simulation if payload else none %}
+{% set race = payload.race if payload else none %}
+
+<section class="hero" data-reveal>
+    <div class="hero__layer hero__layer--back"></div>
+    <div class="hero__layer hero__layer--mid">{% include "_hero_track.html" %}</div>
+    <div class="hero__content">
+        <span class="eyebrow">Race simulation</span>
+        <h1>Watch the race <em>before it happens</em></h1>
+        <p class="hero__lead">
+            The model's predicted order sets each driver's pace, then a full Grand Prix is run on the
+            real circuit — tyres going off, pit stops, and cars stuck behind cars they are quicker than.
+            Run it again and you get a different race.
+        </p>
+        <div class="hero__actions">
+            <a href="/predictions{% if round %}?year={{ year }}&round={{ round }}{% endif %}" class="btn btn--ghost">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
+                </svg>
+                See the prediction behind it
+            </a>
+        </div>
+    </div>
+</section>
+
+<div class="card" data-reveal style="margin-bottom: 28px">
+    <div class="card__header">
+        <h2>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 17a8 8 0 0 1 16 0"/><circle cx="12" cy="17" r="2.5"/><path d="M12 9V5M5 20h14"/>
+            </svg>
+            Pick a Grand Prix
+        </h2>
+        {% if ml_ready %}<span class="card__count">Model ready</span>{% endif %}
+    </div>
+    <div class="card__body">
+        <form action="/simulation" method="get" class="form-row" data-pending="Running the race…">
+            {% include "_year_select.html" %}
+            {% include "_round_select.html" %}
+            <button type="submit" class="btn btn--primary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="6 4 20 12 6 20 6 4"/>
+                </svg>
+                Run simulation
+            </button>
+        </form>
+    </div>
+</div>
+
+{% if error_msg %}
+<div class="notice notice--error" data-reveal>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+    </svg>
+    <div>
+        <h3>Could not run the simulation</h3>
+        <p>{{ error_msg }}</p>
+    </div>
+</div>
+{% endif %}
+
+{% if sim and sim.results %}
+<div class="page-head" data-reveal>
+    <span class="eyebrow">Simulated race</span>
+    <h1>{{ race.event_name }}</h1>
+    <div class="chip-row">
+        <span class="chip">{{ sim.laps }} laps</span>
+        <span class="chip">{{ payload.track.location }}</span>
+        {% if payload.grid_known %}
+        <span class="chip chip--live">Real starting grid</span>
+        {% else %}
+        <span class="chip chip--warn">Before qualifying — grid estimated from car strength</span>
+        {% endif %}
+        {% if payload.pace.is_estimate %}
+        <span class="chip">Pace reference from {{ payload.pace.source_year }}</span>
+        {% endif %}
+        <span class="chip">Seed {{ sim.seed }}</span>
+    </div>
+</div>
+
+<div class="sim" data-reveal>
+    <div class="sim__stage">
+        <div class="sim__trackwrap">
+            <svg class="sim__track" viewBox="-40 -40 1080 1080" role="img"
+                 aria-label="{{ payload.track.location }} circuit with the simulated field">
+                <defs>
+                    <filter id="carGlow" x="-50%" y="-50%" width="200%" height="200%">
+                        <feGaussianBlur stdDeviation="6" result="blur"/>
+                        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                    </filter>
+                </defs>
+                <path class="sim__tarmac" data-track-path fill="none"/>
+                <path class="sim__kerb" data-track-path fill="none"/>
+                <g data-start-line></g>
+                <g data-cars></g>
+            </svg>
+
+            <div class="sim__hud">
+                <div class="sim__hudbox">
+                    <span class="sim__hudlabel">Lap</span>
+                    <span class="sim__hudvalue" data-sim-lap>1 / {{ sim.laps }}</span>
+                </div>
+                <div class="sim__hudbox">
+                    <span class="sim__hudlabel">Race time</span>
+                    <span class="sim__hudvalue" data-sim-clock>0:00</span>
+                </div>
+                <div class="sim__hudbox">
+                    <span class="sim__hudlabel">Leader</span>
+                    <span class="sim__hudvalue" data-sim-leader>—</span>
+                </div>
+            </div>
+
+            <p class="sim__note">{{ payload.track.note }}</p>
+        </div>
+
+        <div class="sim__controls">
+            <button type="button" class="btn btn--primary" data-sim-toggle>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" data-icon-play>
+                    <polygon points="6 4 20 12 6 20 6 4"/>
+                </svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" data-icon-pause hidden>
+                    <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
+                </svg>
+                <span data-sim-toggle-text>Start race</span>
+            </button>
+
+            <div class="sim__speeds" role="group" aria-label="Playback speed">
+                {% for mult in [1, 2, 4, 8] %}
+                <button type="button" class="sim__speed{% if mult == 2 %} is-active{% endif %}" data-sim-speed="{{ mult }}">
+                    {{ mult }}×
+                </button>
+                {% endfor %}
+            </div>
+
+            <label class="sim__scrub">
+                <span class="sr-only">Jump to a lap</span>
+                <input type="range" min="1" max="{{ sim.laps }}" value="1" step="0.01" data-sim-scrub>
+            </label>
+
+            <a class="btn btn--ghost" href="/simulation?year={{ year }}&round={{ round }}&seed={{ next_seed }}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 12a9 9 0 1 1-3-6.7"/><polyline points="21 3 21 9 15 9"/>
+                </svg>
+                Race it again
+            </a>
+        </div>
+    </div>
+
+    <aside class="sim__board">
+        <div class="sim__boardhead">
+            <h3>Running order</h3>
+            <span class="sim__boardgap">Gap</span>
+        </div>
+        <ol class="sim__order" data-sim-board></ol>
+    </aside>
+</div>
+
+<div class="card" data-reveal style="margin-top: 28px">
+    <div class="card__header">
+        <h2>How this race compared</h2>
+        <span class="card__count">{{ payload.agreement.mean_shift }} places average swing</span>
+    </div>
+    <div class="card__body">
+        <div class="stat-grid">
+            <div class="stat">
+                <span class="stat__label">Winner</span>
+                <span class="stat__value">
+                    {{ sim.results[0].driver_code }}
+                    <small>{% if payload.agreement.winner_as_predicted %}as predicted{% else %}not the model's pick{% endif %}</small>
+                </span>
+            </div>
+            <div class="stat">
+                <span class="stat__label">Predicted podium kept</span>
+                <span class="stat__value">{{ payload.agreement.podium_overlap }}<small> of 3</small></span>
+            </div>
+            <div class="stat">
+                <span class="stat__label">Exact positions matched</span>
+                <span class="stat__value">{{ payload.agreement.exact_positions }}<small> of {{ payload.agreement.field_size }}</small></span>
+            </div>
+            <div class="stat">
+                <span class="stat__label">Winning time</span>
+                <span class="stat__value">{{ sim.race_time_label }}</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card" data-reveal style="margin-top: 28px">
+    <div class="card__header">
+        <h2>Final classification</h2>
+        <span class="card__count">{{ sim.results | length }} runners</span>
+    </div>
+    <div class="table-scroll">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Pos</th>
+                    <th>Driver</th>
+                    <th>Team</th>
+                    <th class="num">Gap</th>
+                    <th class="num">Grid</th>
+                    <th>Strategy</th>
+                    <th class="num">Model said</th>
+                    {% if payload.actual_positions %}<th class="num">Actually</th>{% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in sim.results %}
+                <tr class="{% if r.position <= 3 %}is-p{{ r.position }}{% endif %}">
+                    <td><span class="pos pos--{{ r.position }}">{{ r.position }}</span></td>
+                    <td>
+                        <div class="driver">
+                            <div>
+                                <span class="driver__code" style="color: {{ r.team_color }}">{{ r.driver_code }}</span>
+                                <span class="driver__name">{{ r.driver_name }}</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="team">
+                            <span class="team__name" style="border-left-color: {{ r.team_color }}">{{ r.team_name }}</span>
+                        </div>
+                    </td>
+                    <td class="num">{% if r.position == 1 %}leader{% else %}+{{ '%.1f' | format(r.gap) }}s{% endif %}</td>
+                    <td class="num">{{ r.grid or '—' }}</td>
+                    <td>
+                        <span class="strategy">
+                            {% for stint in r.stints %}
+                            <span class="tyre tyre--{{ stint.compound | lower }}" title="{{ stint.compound }}, {{ stint.laps }} laps"></span>
+                            {% endfor %}
+                            <small>{{ r.pit_laps | length }} stop{{ '' if r.pit_laps | length == 1 else 's' }}</small>
+                        </span>
+                    </td>
+                    <td class="num">
+                        P{{ r.predicted_position }}
+                        {% if r.vs_prediction > 0 %}
+                        <span class="delta delta--up">▲ {{ r.vs_prediction }}</span>
+                        {% elif r.vs_prediction < 0 %}
+                        <span class="delta delta--down">▼ {{ -r.vs_prediction }}</span>
+                        {% endif %}
+                    </td>
+                    {% if payload.actual_positions %}
+                    <td class="num">
+                        {% set real = payload.actual_positions.get(r.driver_code) %}
+                        {% if real %}P{{ real }}{% else %}—{% endif %}
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if payload.actual_positions %}
+<p class="hint" data-reveal style="margin-top: 18px">
+    This Grand Prix has already run, so the last column is the real classification. The simulation never
+    sees it — both it and the prediction behind it work only from data that existed before the start.
+</p>
+{% endif %}
+
+{% elif not error_msg %}
+<div class="notice notice--info" data-reveal>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>
+    </svg>
+    <div>
+        <h3>Pick a race to simulate</h3>
+        <p>
+            Choose a season and Grand Prix above. Any round works: for one still to come the grid is
+            estimated from car strength, and for one already run you also get the real result to compare against.
+        </p>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+{# Blocks have their own scope, so the simulation is re-read from the payload. #}
+{% if payload and payload.simulation and payload.simulation.results %}
+<script id="sim-data" type="application/json">{{ {
+    "laps": payload.simulation.laps,
+    "raceTime": payload.simulation.race_time,
+    "track": payload.track.points,
+    "drivers": payload.simulation.results
+} | tojson }}</script>
+<script src="/static/js/simulation.js?v=5"></script>
+{% endif %}
+{% endblock %}

@@ -1515,6 +1515,304 @@ a {
     color: var(--text-faint);
 }
 
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* --------------------------------------------------------------------------
+   Race simulation
+   -------------------------------------------------------------------------- */
+
+.sim {
+    display: grid;
+    gap: 20px;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    align-items: start;
+}
+
+.sim__stage {
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    background: linear-gradient(160deg, var(--ink-2), var(--ink-0));
+    overflow: hidden;
+}
+
+.sim__trackwrap {
+    position: relative;
+    padding: 18px;
+}
+
+.sim__track {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 62vh;
+    overflow: visible;
+}
+
+/* Icon buttons swap their glyph with the hidden attribute, which a bare
+   display rule on svg would otherwise win against. */
+svg[hidden] {
+    display: none;
+}
+
+.sim__tarmac {
+    stroke: rgba(255, 255, 255, 0.07);
+    stroke-width: 30;
+    stroke-linejoin: round;
+}
+
+.sim__kerb {
+    stroke: rgba(255, 255, 255, 0.3);
+    stroke-width: 2.5;
+    stroke-linejoin: round;
+    stroke-dasharray: 12 8;
+}
+
+.sim-car {
+    transition: opacity 180ms ease;
+}
+
+.sim-car__label {
+    font-family: var(--font-mono);
+    font-size: 19px;
+    font-weight: 700;
+    fill: rgba(255, 255, 255, 0.82);
+    paint-order: stroke;
+    stroke: rgba(0, 0, 0, 0.85);
+    stroke-width: 4px;
+    transition: opacity 220ms ease;
+}
+
+.sim-car.is-leader circle {
+    stroke: #fff;
+    stroke-width: 3.5;
+    filter: url(#carGlow);
+}
+
+.sim-car.is-pitting {
+    opacity: 0.45;
+}
+
+.sim__hud {
+    position: absolute;
+    top: 26px;
+    left: 26px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.sim__hudbox {
+    padding: 9px 14px;
+    border-radius: var(--radius-sm);
+    background: rgba(5, 6, 10, 0.78);
+    border: 1px solid var(--line);
+    backdrop-filter: blur(10px);
+}
+
+.sim__hudlabel {
+    display: block;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+}
+
+.sim__hudvalue {
+    font-family: var(--font-mono);
+    font-size: 17px;
+    font-weight: 700;
+}
+
+.sim__note {
+    margin: 10px 2px 0;
+    font-size: 12px;
+    color: var(--text-faint);
+}
+
+.sim__controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 16px 18px;
+    border-top: 1px solid var(--line);
+    background: rgba(0, 0, 0, 0.35);
+}
+
+.sim__speeds {
+    display: inline-flex;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--line-strong);
+    overflow: hidden;
+}
+
+.sim__speed {
+    padding: 9px 13px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-dim);
+    background: transparent;
+    border: 0;
+    border-right: 1px solid var(--line);
+    cursor: pointer;
+    transition: background 160ms ease, color 160ms ease;
+}
+
+.sim__speed:last-child {
+    border-right: 0;
+}
+
+.sim__speed:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.sim__speed.is-active {
+    color: #fff;
+    background: var(--red);
+}
+
+.sim__scrub {
+    flex: 1 1 180px;
+    min-width: 140px;
+    display: flex;
+}
+
+.sim__scrub input {
+    width: 100%;
+    accent-color: var(--red);
+    cursor: pointer;
+}
+
+/* Live running order */
+.sim__board {
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    background: var(--glass);
+    overflow: hidden;
+}
+
+.sim__boardhead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--line);
+}
+
+.sim__boardhead h3 {
+    font-size: 13px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.sim__boardgap {
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+}
+
+.sim__order {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 8px;
+    list-style: none;
+    max-height: 62vh;
+    overflow-y: auto;
+}
+
+.sim__row {
+    display: grid;
+    grid-template-columns: 26px 44px 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 10px;
+    border-radius: 8px;
+    transition: background 200ms ease, opacity 200ms ease;
+}
+
+/* Rows are reordered with the CSS order property, so striping by position in
+   the DOM would flicker as cars change places. */
+.sim__row {
+    background: rgba(255, 255, 255, 0.02);
+    margin-bottom: 3px;
+}
+
+.sim__row.is-podium {
+    background: rgba(255, 255, 255, 0.07);
+}
+
+.sim__row.is-leader {
+    background: linear-gradient(90deg, rgba(255, 24, 1, 0.22), rgba(255, 255, 255, 0.04));
+}
+
+.sim__row.is-pitting {
+    opacity: 0.5;
+}
+
+.sim__pos {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-faint);
+    text-align: right;
+}
+
+.sim__code {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.sim__bar {
+    height: 4px;
+    border-radius: 2px;
+    opacity: 0.55;
+}
+
+.sim__gap {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-dim);
+    min-width: 62px;
+    text-align: right;
+}
+
+/* Tyre strategy in the classification table */
+.strategy {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.strategy small {
+    margin-left: 4px;
+    font-size: 11px;
+    color: var(--text-faint);
+}
+
+@media (max-width: 1100px) {
+    .sim {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .sim__order {
+        max-height: 320px;
+    }
+}
+
 .notice {
     display: flex;
     gap: 16px;
